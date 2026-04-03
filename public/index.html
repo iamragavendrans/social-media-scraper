@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snap Story Downloader Clone</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+      .container { max-width: 960px; margin: 0 auto; padding: 24px; }
+      h1 { margin-bottom: 8px; }
+      p { color: #94a3b8; }
+      form { display: flex; gap: 8px; margin: 20px 0; }
+      input { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #334155; background: #020617; color: #e2e8f0; }
+      button { padding: 12px 16px; border: none; border-radius: 8px; background: #22c55e; color: #052e16; font-weight: 700; cursor: pointer; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+      .card { background: #111827; padding: 12px; border-radius: 10px; border: 1px solid #1f2937; }
+      .card img, .card video { width: 100%; border-radius: 8px; background: #000; max-height: 300px; object-fit: cover; }
+      .meta { font-size: 12px; color: #a1a1aa; margin: 8px 0; word-break: break-all; }
+      .error { color: #f87171; margin-top: 12px; }
+      .muted { color: #94a3b8; }
+      .hidden { display: none; }
+      .kpis { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+      .kpis div { background: #1e293b; border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <h1>Snapchat Story/Post Fetcher</h1>
+      <p>Enter a Snapchat username or full public URL. This clones the Snaplytics-style workflow and fetches latest publicly available media links.</p>
+
+      <form id="lookupForm">
+        <input id="query" placeholder="e.g. extraavantika or https://www.snapchat.com/add/extraavantika" required />
+        <button type="submit">Fetch</button>
+      </form>
+
+      <div id="status" class="muted"></div>
+      <div id="error" class="error hidden"></div>
+      <section id="summary" class="hidden">
+        <h2>Results</h2>
+        <div id="kpis" class="kpis"></div>
+        <div id="gallery" class="grid"></div>
+      </section>
+    </main>
+
+    <script>
+      const form = document.getElementById('lookupForm');
+      const queryInput = document.getElementById('query');
+      const statusEl = document.getElementById('status');
+      const errorEl = document.getElementById('error');
+      const summaryEl = document.getElementById('summary');
+      const kpisEl = document.getElementById('kpis');
+      const galleryEl = document.getElementById('gallery');
+
+      function card(media) {
+        const preview = media.mediaType === 'video'
+          ? `<video controls src="${media.mediaUrl}"></video>`
+          : `<img src="${media.mediaUrl}" alt="snap media" />`;
+        return `<article class="card">${preview}<div class="meta">${media.category} · ${media.mediaType}</div><a href="${media.mediaUrl}" target="_blank" rel="noreferrer">Open media</a></article>`;
+      }
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        errorEl.classList.add('hidden');
+        summaryEl.classList.add('hidden');
+        statusEl.textContent = 'Loading public Snapchat data...';
+        galleryEl.innerHTML = '';
+        kpisEl.innerHTML = '';
+
+        const q = queryInput.value.trim();
+
+        try {
+          const response = await fetch(`/api/snapchat?q=${encodeURIComponent(q)}`);
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Lookup failed');
+
+          statusEl.textContent = `Fetched ${data.totals.all} media items for @${data.username}.`;
+          const kpis = [
+            ['Stories', data.totals.stories],
+            ['Highlights', data.totals.highlights],
+            ['Spotlight', data.totals.spotlight],
+            ['Posts', data.totals.posts],
+            ['Other', data.totals.other]
+          ];
+
+          kpisEl.innerHTML = kpis.map(([label, value]) => `<div><strong>${label}:</strong> ${value}</div>`).join('');
+          galleryEl.innerHTML = data.media.map(card).join('') || '<p class="muted">No public media URLs found in currently exposed profile payloads.</p>';
+          summaryEl.classList.remove('hidden');
+        } catch (error) {
+          errorEl.textContent = error.message;
+          errorEl.classList.remove('hidden');
+          statusEl.textContent = '';
+        }
+      });
+    </script>
+  </body>
+</html>
